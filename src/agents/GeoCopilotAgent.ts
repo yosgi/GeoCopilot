@@ -1,14 +1,10 @@
 import { ChatOpenAI } from "@langchain/openai";
 import { AgentExecutor, createToolCallingAgent } from "langchain/agents";
 import { ChatPromptTemplate } from "@langchain/core/prompts";
-import { flyToTool } from "../tools/flyToTool";
-import { highlightTool } from "../tools/highlight";
-import { layerControlTool } from "../tools/layerControl";
-import { cameraControlTool } from "../tools/cameraControl";
-import { measurementTool } from "../tools/measurementTool";
-import type { SceneContext } from "../hooks/useSceneContext";
+import { createLayerControlTool } from '../tools/layerControl';
+import type { SceneContext } from '../hooks/useSceneContext';
+import type { SceneContextManager } from '../hooks/useSceneContext';
 
-// 扩展的命令接口
 interface GeoCopilotCommand {
   action: string;
   target?: string;
@@ -24,97 +20,68 @@ interface AgentResponse {
 
 export const runLocalAgent = async (
   input: string, 
-  sceneContext: SceneContext
+  sceneContext: SceneContext,
+  contextManager: SceneContextManager
 ): Promise<AgentResponse> => {
+  console.log('🔍 [GeoCopilotAgent] Starting runLocalAgent with input:', input);
+  
   const model = new ChatOpenAI({
     temperature: 0,
     modelName: "gpt-4",
     openAIApiKey: import.meta.env.VITE_OPENAI_API_KEY
   });
 
-  // 构建动态的场景信息prompt
+  // build scene prompt
   const sceneInfo = buildScenePrompt(sceneContext);
+  console.log('🔍 [GeoCopilotAgent] Built scene prompt:', sceneInfo);
 
   const prompt = ChatPromptTemplate.fromMessages([
     [
       "system",
       `You are an AI assistant for controlling a 3D BIM (Building Information Modeling) digital twin scene using natural language commands.
 
-CURRENT SCENE CONTEXT:
-${sceneInfo}
+    CURRENT SCENE CONTEXT:
+    ${sceneInfo}
 
-AVAILABLE ACTIONS:
-1. Camera Control:
-   - flyTo(target): Move camera to specific location or entity
-   - setView(heading, pitch, roll): Set camera orientation
-   - zoomTo(distance): Set camera height/distance
-   - reset(): Reset to default view
+    RESPONSE FORMAT:
+    You have access to tools that you can use to perform actions. IMPORTANT: You MUST use the appropriate tool to perform operations. Do not respond with plain text - always use tools.
 
-2. Layer Management:
-   - showLayer(layerName): Make layer visible
-   - hideLayer(layerName): Make layer invisible
-   - toggleLayer(layerName): Toggle layer visibility
-   - showOnlyLayer(layerName): Show only specified layer, hide others
+    For layer operations, use the layerControl tool. Available layers: ${sceneContext.layers.map(l => l.name).join(', ')}. For example:
+    - To hide all layers: Use layerControl tool with action="hideAll"
+    - To show a layer: Use layerControl tool with action="show", layerId="LayerName"
+    - To hide a layer: Use layerControl tool with action="hide", layerId="LayerName"
+    - To hide Site layer: Use layerControl tool with action="hide", layerId="Site"
 
-3. Feature Interaction:
-   - highlight(entityId, color): Highlight entity (default: yellow)
-   - select(entityId): Select entity for detailed view
-   - clearSelection(): Clear all selections
+    Always provide an explanation of what you're doing and set success to true if the request can be fulfilled.
 
-4. Analysis Tools:
-   - measure(type): Start measurement tool (distance, area, height)
-   - query(entityId): Get entity properties and information
-   - filter(criteria): Filter entities by properties
+    For layer-related commands, use exact layer names from the context: ${sceneContext.layers.map(l => l.name).join(', ')}
 
-5. Environment Control:
-   - setTime(isoTime): Change scene time
-   - toggleShadows(): Enable/disable shadows
-   - setLighting(mode): Change lighting (day/night/dawn/dusk)
+    IMPORTANT RULES:
+    1. Use exact layer names as they appear in the context
+    2. For spatial references like "main building", "building", "structure", map to appropriate layers or coordinates
+    3. For "site" references, consider hiding all BIM layers (Architecture, Facade, Structural, Electrical, HVAC, Plumbing) as they represent the building site
+    4. If a request cannot be fulfilled, set success: false and explain why
+    5. Always provide helpful explanations of your actions
+    6. Consider the current camera position and layer states when planning actions
+          `
+        ],
+        ["user", "{input}"],
+        ["assistant", "{agent_scratchpad}"]
+      ]);
 
-RESPONSE FORMAT:
-Always respond with a JSON object containing:
-- commands: Array of command objects
-- explanation: Brief explanation of what you're doing
-- success: boolean indicating if the request can be fulfilled
-
-Example responses:
-{
-  "commands": [
-    { "action": "flyTo", "target": "main_building" },
-    { "action": "highlight", "target": "Architecture", "color": "blue" }
-  ],
-  "explanation": "Flying to the main building and highlighting the architecture layer",
-  "success": true
-}
-
-For layer-related commands, use exact layer names from the context: ${sceneContext.layers.map(l => l.name).join(', ')}
-
-IMPORTANT RULES:
-1. Use exact layer names as they appear in the context
-2. For spatial references like "main building", "building", "structure", map to appropriate layers or coordinates
-3. If a request cannot be fulfilled, set success: false and explain why
-4. Always provide helpful explanations of your actions
-5. Consider the current camera position and layer states when planning actions
-      `
-    ],
-    ["user", "{input}"],
-    ["assistant", "{agent_scratchpad}"]
-  ]);
-
-  // 创建工具集合
   const tools = [
-    flyToTool,
-    highlightTool,
-    layerControlTool,
-    cameraControlTool,
-    measurementTool
+    createLayerControlTool(contextManager),
   ];
+  
+  console.log('🔍 [GeoCopilotAgent] Created tools:', tools.map(t => t.name));
 
   const agent = await createToolCallingAgent({
     llm: model,
     tools,
     prompt,
   });
+  
+  console.log('🔍 [GeoCopilotAgent] Created agent with tools');
 
   const executor = new AgentExecutor({
     agent,
@@ -124,30 +91,39 @@ IMPORTANT RULES:
   });
 
   try {
+    console.log('🔍 [GeoCopilotAgent] Invoking executor with input:', input);
+    
     const result = await executor.invoke({ 
       input,
       // pass the scene context as an additional input
       sceneContext: JSON.stringify(sceneContext)
     });
 
-    console.log("Agent result:", result);
+    console.log("🔍 [GeoCopilotAgent] Agent result:", result);
 
     // parse the AI response
+    console.log('🔍 [GeoCopilotAgent] Parsing agent response:', result.output);
     const parsedResponse = parseAgentResponse(result.output);
+    console.log('🔍 [GeoCopilotAgent] Parsed response:', parsedResponse);
     
-    return {
+    const response = {
       commands: parsedResponse.commands || [],
       explanation: parsedResponse.explanation || "Command executed",
       success: true
     };
+    
+    console.log('🔍 [GeoCopilotAgent] Returning response:', response);
+    return response;
 
   } catch (error) {
-    console.error("Agent execution error:", error);
-    return {
+    console.error("🔍 [GeoCopilotAgent] Agent execution error:", error);
+    const errorResponse = {
       commands: [],
       explanation: `Error executing command: ${(error as Error).message}`,
       success: false
     };
+    console.log('🔍 [GeoCopilotAgent] Returning error response:', errorResponse);
+    return errorResponse;
   }
 };
 
@@ -195,35 +171,57 @@ LAYER DETAILS:
 
 // parse the AI agent response
 function parseAgentResponse(output: string): Partial<AgentResponse> {
+  console.log('🔍 [GeoCopilotAgent] parseAgentResponse called with output:', output);
+  
   try {
     // try to parse the JSON directly
+    console.log('🔍 [GeoCopilotAgent] Attempting direct JSON parse');
     const parsed = JSON.parse(output);
-    return {
-      commands: parsed.commands || [],
+    console.log('🔍 [GeoCopilotAgent] Direct JSON parse successful:', parsed);
+    
+    // Commands should already be in our expected format
+    const commands = parsed.commands || [];
+    console.log('🔍 [GeoCopilotAgent] Commands from AI:', commands);
+    
+    const result = {
+      commands: commands,
       explanation: parsed.explanation || "Command executed",
       success: parsed.success !== false
     };
-  } catch {
-    // if not a valid JSON, try to extract commands from the text
-    console.warn("Failed to parse JSON response, attempting text extraction:", output);
+    console.log('🔍 [GeoCopilotAgent] Returning converted result:', result);
+    return result;
+  } catch (parseError) {
+    console.warn("🔍 [GeoCopilotAgent] Failed to parse JSON response, attempting text extraction:", output);
+    console.warn("🔍 [GeoCopilotAgent] Parse error:", parseError);
     
     // try to extract the JSON block from the text
     const jsonMatch = output.match(/```json\s*([\s\S]*?)\s*```/) || output.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
+      console.log('🔍 [GeoCopilotAgent] Found JSON match:', jsonMatch[0]);
       try {
         const parsed = JSON.parse(jsonMatch[1] || jsonMatch[0]);
-        return {
-          commands: parsed.commands || [],
+        console.log('🔍 [GeoCopilotAgent] Extracted JSON parse successful:', parsed);
+        
+        // Commands should already be in our expected format
+        const commands = parsed.commands || [];
+        
+        const result = {
+          commands: commands,
           explanation: parsed.explanation || "Command extracted from text",
           success: parsed.success !== false
         };
+        console.log('🔍 [GeoCopilotAgent] Returning extracted result:', result);
+        return result;
       } catch (e) {
-        console.error("Failed to parse extracted JSON:", e);
+        console.error("🔍 [GeoCopilotAgent] Failed to parse extracted JSON:", e);
       }
     }
 
     // final fallback: generate simple commands based on keywords
-    return fallbackCommandExtraction(output);
+    console.log('🔍 [GeoCopilotAgent] Using fallback command extraction');
+    const fallbackResult = fallbackCommandExtraction(output);
+    console.log('🔍 [GeoCopilotAgent] Fallback result:', fallbackResult);
+    return fallbackResult;
   }
 }
 
@@ -232,18 +230,50 @@ function fallbackCommandExtraction(text: string): Partial<AgentResponse> {
   const commands: GeoCopilotCommand[] = [];
   const lowerText = text.toLowerCase();
 
-  // simple keyword matching
+  console.log('🔍 [GeoCopilotAgent] Fallback extraction analyzing text:', lowerText);
+
+  // // simple keyword matching for layer operations
+  // if (lowerText.includes('hide') && lowerText.includes('all')) {
+  //   console.log('🔍 [GeoCopilotAgent] Detected hide all layers command');
+  //   commands.push({ action: 'hideAll' });
+  // } else if (lowerText.includes('show') && lowerText.includes('all')) {
+  //   console.log('🔍 [GeoCopilotAgent] Detected show all layers command');
+  //   commands.push({ action: 'showAll' });
+  // } else if (lowerText.includes('hide') && lowerText.includes('layer')) {
+  //   console.log('🔍 [GeoCopilotAgent] Detected hide layer command');
+  //   // Try to extract layer name from context
+  //   commands.push({ action: 'hideLayer', target: 'Architecture' }); // Default fallback
+  // } else if (lowerText.includes('show') && lowerText.includes('layer')) {
+  //   console.log('🔍 [GeoCopilotAgent] Detected show layer command');
+  //   commands.push({ action: 'showLayer', target: 'Architecture' }); // Default fallback
+  // } else if (lowerText.includes('hide') && lowerText.includes('site')) {
+  //   console.log('🔍 [GeoCopilotAgent] Detected hide site layer command');
+  //   commands.push({ action: 'hideLayer', target: 'Site' });
+  // } else if (lowerText.includes('show') && lowerText.includes('site')) {
+  //   console.log('🔍 [GeoCopilotAgent] Detected show site layer command');
+  //   commands.push({ action: 'showLayer', target: 'Site' });
+  // } else if (lowerText.includes('hide') && lowerText.includes('structural')) {
+  //   console.log('🔍 [GeoCopilotAgent] Detected hide structural layer command');
+  //   commands.push({ action: 'hideLayer', target: 'Structural' });
+  // } else if (lowerText.includes('show') && lowerText.includes('structural')) {
+  //   console.log('🔍 [GeoCopilotAgent] Detected show structural layer command');
+  //   commands.push({ action: 'showLayer', target: 'Structural' });
+  // } else if (lowerText.includes('hide') && lowerText.includes('architecture')) {
+  //   console.log('🔍 [GeoCopilotAgent] Detected hide architecture layer command');
+  //   commands.push({ action: 'hideLayer', target: 'Architecture' });
+  // } else if (lowerText.includes('show') && lowerText.includes('architecture')) {
+  //   console.log('🔍 [GeoCopilotAgent] Detected show architecture layer command');
+  //   commands.push({ action: 'showLayer', target: 'Architecture' });
+  // }
+
+  // simple keyword matching for fly operations
   if (lowerText.includes('fly') || lowerText.includes('goto') || lowerText.includes('move')) {
     if (lowerText.includes('building')) {
       commands.push({ action: 'flyTo', target: 'main_building' });
     }
   }
 
-  if (lowerText.includes('hide') || lowerText.includes('show')) {
-    if (lowerText.includes('structural')) {
-      commands.push({ action: lowerText.includes('hide') ? 'hideLayer' : 'showLayer', target: 'Structural' });
-    }
-  }
+  console.log('🔍 [GeoCopilotAgent] Fallback extracted commands:', commands);
 
   return {
     commands,
@@ -252,66 +282,53 @@ function fallbackCommandExtraction(text: string): Partial<AgentResponse> {
   };
 }
 
-// extended tool function example
-export const createEnhancedTools = () => {
-  // these tools can access the scene context to make more intelligent decisions
-  return [
-    // tools that can dynamically adjust their behavior based on the current scene state
-    flyToTool,
-    highlightTool,
-    layerControlTool,
-    cameraControlTool,
-    measurementTool
-  ];
-};
-
-// preprocess the user input, add context understanding
-export const preprocessUserInput = (input: string): string => {
-  // process relative location references
-  const processedInput = input
-    .replace(/建筑|building/gi, 'main building')
-    .replace(/结构|structural/gi, 'Structural layer')
-    .replace(/立面|facade/gi, 'Facade layer')
-    .replace(/电气|electrical/gi, 'Electrical layer')
-    .replace(/暖通|hvac/gi, 'HVAC layer')
-    .replace(/管道|plumbing/gi, 'Plumbing layer');
-
-  return processedInput;
-};
-
 // enhanced version of the example
 export const runEnhancedAgent = async (
   input: string,
-  sceneContext: SceneContext
+  sceneContext: SceneContext,
+  contextManager: SceneContextManager
 ): Promise<AgentResponse> => {
-  // preprocess the user input
-  const processedInput = preprocessUserInput(input);
+  console.log('🔍 [GeoCopilotAgent] Starting runEnhancedAgent with input:', input);
   
   // run the agent
-  const result = await runLocalAgent(processedInput, sceneContext);
+  const result = await runLocalAgent(input, sceneContext, contextManager);
+  console.log('🔍 [GeoCopilotAgent] runLocalAgent result:', result);
   
   // post-process the commands to ensure they are applicable to the current scene
   const validatedCommands = validateCommands(result.commands, sceneContext);
+  console.log('🔍 [GeoCopilotAgent] Validated commands:', validatedCommands);
   
-  return {
+  const enhancedResponse = {
     ...result,
     commands: validatedCommands
   };
+  
+  console.log('🔍 [GeoCopilotAgent] Enhanced response:', enhancedResponse);
+  return enhancedResponse;
 };
 
 // validate the commands to ensure they are applicable to the current scene
 function validateCommands(commands: GeoCopilotCommand[], context: SceneContext): GeoCopilotCommand[] {
-  return commands.filter(command => {
+  console.log('🔍 [GeoCopilotAgent] Validating commands:', commands);
+  console.log('🔍 [GeoCopilotAgent] Available layers:', context.layers.map(l => l.name));
+  
+  const validatedCommands = commands.filter(command => {
+    console.log('🔍 [GeoCopilotAgent] Validating command:', command);
+    
     // validate the layer commands
     if (['showLayer', 'hideLayer', 'toggleLayer'].includes(command.action)) {
       const layerExists = context.layers.some(layer => layer.name === command.target);
       if (!layerExists) {
-        console.warn(`Layer "${command.target}" not found in scene`);
+        console.warn(`🔍 [GeoCopilotAgent] Layer "${command.target}" not found in scene`);
         return false;
       }
+      console.log('🔍 [GeoCopilotAgent] Layer command validated:', command);
     }
     
     // can add more validation logic
     return true;
   });
+  
+  console.log('🔍 [GeoCopilotAgent] Validation result:', validatedCommands);
+  return validatedCommands;
 }

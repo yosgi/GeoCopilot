@@ -103,17 +103,18 @@ export const DemoPage = () => {
         for (const { title, assetId, visible } of tilesetData) {
           try {
             const tileset = await Cesium.Cesium3DTileset.fromIonAssetId(assetId);
-           
-            
-            
             const addedTileset = viewerRef.current.scene.primitives.add(tileset);
-            console.log(`Loaded tileset: ${title}`);
-            console.log(addedTileset);
-            
+            const layerId = title.toLowerCase();
+            contextManager.registerCesiumObject(layerId, tileset, {
+                name: title,
+                type: 'BIM',
+                description: title + ' layer for building visualization',
+                assetId: assetId
+              });
             tileset.show = visible;
             tilesetMap.set(title, addedTileset);
             layerInfos.push({
-                id: title.toLowerCase(),
+                id: layerId,
                 name: title,
                 type: 'BIM' as const,
                 visible: visible,
@@ -261,25 +262,17 @@ export const DemoPage = () => {
   };
 
   const toggleLayerVisibility = useCallback((layerName: string) => {
-    console.log(`🎯 Toggling layer: ${layerName}`);
-    console.log('Current map keys:', Array.from(tilesetMapRef.current.keys()));
-    
     setLayerVisibility(prev => {
       const currentVisible = prev[layerName];
       const newVisible = !currentVisible;
-      console.log(`State change: ${layerName} from ${currentVisible} to ${newVisible}`);
       const tileset = tilesetMapRef.current.get(layerName);
       if (tileset) {
-        console.log(`Found tileset for ${layerName}, current show: ${tileset.show}`);
-        console.log(tileset);
         tileset.show = newVisible;
-        console.log(`✅ Set tileset.show to: ${newVisible}`);
         setTimeout(() => {
             viewerRef.current?.scene.requestRender();
           }, 50);
       } else {
         console.error(`❌ Tileset not found for layer: ${layerName}`);
-        console.log('Available tilesets:', Array.from(tilesetMapRef.current.keys()));
       }
       
       const newVisibilityState = { ...prev, [layerName]: newVisible };
