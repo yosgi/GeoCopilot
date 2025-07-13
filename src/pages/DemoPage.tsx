@@ -10,7 +10,7 @@ export const DemoPage = () => {
   const [input, setInput] = useState("");
   const [layerVisibility, setLayerVisibility] = useState<Record<string, boolean>>({});
   const { contextManager, context, getAIContext } = useSceneContext();
-  const { commands, loading, error, lastResponse, run, clearHistory } = useGeoCopilot(contextManager);
+  const { loading, error, lastResponse, run, clearHistory,initialize,layerControl } = useGeoCopilot(contextManager);
   const tilesetMapRef = useRef<Map<string, Cesium.Cesium3DTileset>>(new Map());
 
 
@@ -24,7 +24,7 @@ export const DemoPage = () => {
         viewerRef.current = new Cesium.Viewer(cesiumContainerRef.current, {
           globe: false,
         });
-        contextManager.setViewer(viewerRef.current);
+        initialize(viewerRef.current);
 
         // Enable rendering the sky
         viewerRef.current.scene.skyAtmosphere.show = true;
@@ -105,7 +105,7 @@ export const DemoPage = () => {
             const tileset = await Cesium.Cesium3DTileset.fromIonAssetId(assetId);
             const addedTileset = viewerRef.current.scene.primitives.add(tileset);
             const layerId = title.toLowerCase();
-            contextManager.registerCesiumObject(layerId, tileset, {
+            layerControl.registerObject(layerId, tileset, {
                 name: title,
                 type: 'BIM',
                 description: title + ' layer for building visualization',
@@ -128,7 +128,6 @@ export const DemoPage = () => {
             console.log(`Error loading tileset (${title}): ${error}`);
           }
         }
-        contextManager.updateLayers(layerInfos);
 
         // Get default left click handler for when a feature is not picked on left click
         const clickHandler = viewerRef.current.screenSpaceEventHandler.getInputAction(
@@ -251,7 +250,7 @@ export const DemoPage = () => {
         tilesetMap.clear();
       }
     };
-  }, [contextManager]);
+  }, []);
 
   const handleCommand = async () => {
     if (!input.trim()) return;
@@ -277,16 +276,9 @@ export const DemoPage = () => {
       
       const newVisibilityState = { ...prev, [layerName]: newVisible };
       
-      const updatedLayers = context.layers.map(layer => 
-        layer.name === layerName 
-          ? { ...layer, visible: newVisible }
-          : layer
-      );
-      contextManager.updateLayers(updatedLayers);
-      
       return newVisibilityState;
     });
-  }, [context.layers, contextManager]);
+  }, []);
 
   
 
@@ -419,13 +411,12 @@ export const DemoPage = () => {
         <div style={{ fontSize: 12, lineHeight: 1.4 }}>
           <div><strong>Location:</strong> {context.location.name}</div>
           <div><strong>Camera height:</strong> {context.camera.position[2]?.toFixed(0)}m</div>
-          <div><strong>Visible layers:</strong> {context.layers.filter(l => l.visible).length}/{context.layers.length}</div>
           <div><strong>Time:</strong> {context.environment.lighting === 'day' ? '☀️' : '🌙'} {new Date(context.environment.time).toLocaleTimeString()}</div>
         </div>
       </div>
 
       {/* AI command history */}
-      {commands.length > 0 && (
+      {/* {commands.length > 0 && (
         <div style={{ marginBottom: 16 }}>
           <h3 style={{ fontSize: 16, marginBottom: 8 }}>🤖 Recent AI commands</h3>
           <div style={{ maxHeight: 150, overflowY: "auto" }}>
@@ -451,7 +442,7 @@ export const DemoPage = () => {
             ))}
           </div>
         </div>
-      )}
+      )} */}
 
       {/* Traditional layer control */}
       <div style={{ marginBottom: 16, color: "#000" }}>
@@ -536,7 +527,7 @@ export const DemoPage = () => {
           🔧 Developer debug information
         </summary>
         <div style={{ marginTop: 8 }}>
-          <div style={{ marginBottom: 8 }}>
+          {/* <div style={{ marginBottom: 8 }}>
             <strong>Scene layer status:</strong>
             <pre style={{ fontSize: 10, background: "#f5f5f5", padding: 4, margin: "4px 0" }}>
               {JSON.stringify(
@@ -544,7 +535,7 @@ export const DemoPage = () => {
                 null, 2
               )}
             </pre>
-          </div>
+          </div> */}
           
           <div style={{ marginBottom: 8 }}>
             <strong>Camera status:</strong>
@@ -557,14 +548,14 @@ export const DemoPage = () => {
             </pre>
           </div>
 
-          {commands.length > 0 && (
+          {/* {commands.length > 0 && (
             <div>
               <strong>Last executed command:</strong>
               <pre style={{ fontSize: 10, background: "#f5f5f5", padding: 4, margin: "4px 0" }}>
                 {JSON.stringify(commands[commands.length - 1], null, 2)}
               </pre>
             </div>
-          )}
+          )} */}
         </div>
       </details>
     </div>
