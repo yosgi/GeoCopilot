@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import * as Cesium from "cesium";
-import { CesiumController } from "../core/CesiumController";
 import { useGeoCopilot } from "../hooks/useGeoCopilot";
 import { useSceneContext } from "../hooks/useSceneContext";
 
@@ -10,7 +9,8 @@ export const DemoPage = () => {
   const [input, setInput] = useState("");
   const [layerVisibility, setLayerVisibility] = useState<Record<string, boolean>>({});
   const { contextManager, context, getAIContext } = useSceneContext();
-  const { loading, error, lastResponse, run, clearHistory,initialize,layerControl } = useGeoCopilot(contextManager);
+  const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
+  const { loading, error, lastResponse, run, clearHistory, initialize, layerControl } = useGeoCopilot(contextManager, apiKey);
   const tilesetMapRef = useRef<Map<string, Cesium.Cesium3DTileset>>(new Map());
 
 
@@ -236,8 +236,6 @@ export const DemoPage = () => {
           viewerRef.current!.selectedEntity = selectedEntity;
           selectedEntity.description = new Cesium.ConstantProperty(createPickedFeatureDescription(pickedFeature));
         }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
-
-        CesiumController.setViewer(viewerRef.current);
       }
     };
     
@@ -311,11 +309,10 @@ export const DemoPage = () => {
   return (
     <div style={{ display: "flex", height: "100vh" }}>
     <div style={{ width: 350, padding: 16, background: "#f8f9fa", overflowY: "auto" }}>
-      <h2>🧠 GeoCopilot AI Dashboard</h2>
 
 
       <div style={{ marginBottom: 16, padding: 12, background: "#e3f2fd", borderRadius: 8 }}>
-        <h3 style={{ margin: "0 0 8px 0", fontSize: 16 }}>🤖 AI Assistant</h3>
+        <h3 style={{ margin: "0 0 8px 0", fontSize: 16,color: "#000" }}>🤖 GeoCopilot</h3>
         
         <textarea
           value={input}

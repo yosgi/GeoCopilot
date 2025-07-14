@@ -7,18 +7,13 @@ import { createLayerControlTool,useLayerControl } from './useLayerControl';
 import { createCameraControlTool,useCameraControl } from './useCameraControl';
 import * as Cesium from 'cesium';
 
-
-
-
-
-
 interface GeoCopilotState {
   loading: boolean;
   error: string | null;
   lastResponse: string | null;
 }
 
-export const useGeoCopilot = (contextManager: SceneContextManager) => {
+export const useGeoCopilot = (contextManager: SceneContextManager, openaiApiKey: string) => {
   const layerControl = useLayerControl();
   const cameraControl = useCameraControl();
   const [state, setState] = useState<GeoCopilotState>({
@@ -28,42 +23,24 @@ export const useGeoCopilot = (contextManager: SceneContextManager) => {
   });
 
   const initialize = useCallback((viewer: Cesium.Viewer) => {
-    // set to context manager (compatibility)
     contextManager.setViewer(viewer);
     cameraControl.registerViewer(viewer);
   }, [contextManager,cameraControl]);
 
   const run = useCallback(async (input: string) => {
-    console.log('🔍 [useGeoCopilot] Starting run with input:', input);
     setState(prev => ({ ...prev, loading: true, error: null }));
-
     try {
-      // get the current scene context
-      const sceneContext = contextManager.getContext();
-      
-      console.log('🔍 [useGeoCopilot] Sending to AI:', { input, sceneContext });
-
-      // call the enhanced AI agent
-      const result = await runNewAgent(input, contextManager,layerControl,cameraControl);
-      
-      console.log('🔍 [useGeoCopilot] AI Response:', result);
-
-      // Use the AI's response directly, but enhance it if it's just a tool call
+      const result = await runNewAgent(input, contextManager, layerControl, cameraControl, openaiApiKey);
       let finalResponse = result.output || 'Operation completed successfully';
-      
-      // If the AI didn't provide a proper response (just tool calls), enhance it
       if (result.intermediateSteps && result.intermediateSteps.length > 0) {
         const allSteps = result.intermediateSteps;
         const successfulSteps = allSteps.filter((step: { observation?: string }) => 
           step.observation && step.observation.includes('Successfully')
         );
-        
         if (successfulSteps.length > 0 && !finalResponse.includes('Successfully')) {
-          // AI didn't provide a proper response, so we enhance it
           const lastStep = successfulSteps[successfulSteps.length - 1];
           const toolAction = lastStep.action.toolInput?.action;
           const layerCount = lastStep.observation.match(/\d+/)?.[0] || '';
-          
           if (toolAction === 'showAll') {
             finalResponse = `I have successfully shown all ${layerCount} layers in the scene.`;
           } else if (toolAction === 'hideAll') {
@@ -77,21 +54,19 @@ export const useGeoCopilot = (contextManager: SceneContextManager) => {
           }
         }
       }
-
       setState(prev => ({
         ...prev,
         loading: false,
         lastResponse: finalResponse
       }));
     } catch (err) {
-      console.error('🔍 [useGeoCopilot] GeoCopilot error:', err);
       setState(prev => ({
         ...prev,
         loading: false,
         error: err instanceof Error ? err.message : 'Unknown error occurred'
       }));
     }
-  }, [contextManager,layerControl]);
+  }, [contextManager,layerControl,openaiApiKey]);
 
   const clearHistory = useCallback(() => {
     setState({
@@ -110,25 +85,23 @@ export const useGeoCopilot = (contextManager: SceneContextManager) => {
   };
 };
 
-
-async function runNewAgent(input: string, contextManager: SceneContextManager,layerControl: ReturnType<typeof useLayerControl>,cameraControl: ReturnType<typeof useCameraControl>) {
-  const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
-  console.log('🔍 [GeoCopilotAgent] API Key exists:', !!apiKey);
-  console.log('🔍 [GeoCopilotAgent] API Key starts with:', apiKey?.substring(0, 10));
+async function runNewAgent(
+  input: string,
+  contextManager: SceneContextManager,
+  layerControl: ReturnType<typeof useLayerControl>,
+  cameraControl: ReturnType<typeof useCameraControl>,
+  openaiApiKey: string
+) {
   const model = new ChatOpenAI({
     temperature: 0,
     modelName: "gpt-4o-mini",
-    openAIApiKey: import.meta.env.VITE_OPENAI_API_KEY,
-    // maxRetries: 1,
+    openAIApiKey: openaiApiKey,
   });
-
   const aiContext = contextManager.getAIContext();
-
   const tools = [
     createLayerControlTool(layerControl),
     createCameraControlTool(cameraControl),
   ];
-
   const prompt = ChatPromptTemplate.fromMessages([
     [
       "system",
@@ -157,13 +130,11 @@ async function runNewAgent(input: string, contextManager: SceneContextManager,la
     ["user", "{input}"],
     ["assistant", "{agent_scratchpad}"]
   ]);
-
   const agent = await createToolCallingAgent({
     llm: model,
     tools,
     prompt,
   });
-
   const executor = new AgentExecutor({
     agent,
     tools,
@@ -172,11 +143,9 @@ async function runNewAgent(input: string, contextManager: SceneContextManager,la
     returnIntermediateSteps: true,  
     handleParsingErrors: true  
   });
-
   const result = await executor.invoke({ 
     input,
   });
-
   return result;
 }
 

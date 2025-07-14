@@ -1,20 +1,66 @@
 {
   "name": "geocopilot",
-  "private": true,
-  "version": "0.0.0",
+  "version": "1.0.3",
+  "description": "AI-powered 3D BIM scene control with natural language commands",
   "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./react": {
+      "import": "./dist/react/index.js",
+      "types": "./dist/react/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
+    "build:lib": "tsc -p tsconfig.lib.json",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "prepublishOnly": "npm run build:lib"
+  },
+  "keywords": [
+    "cesium",
+    "3d",
+    "bim",
+    "ai",
+    "natural-language",
+    "scene-control",
+    "react",
+    "typescript"
+  ],
+  "author": "Yosgi",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yosgi/GeoCopilot"
+  },
+  "bugs": {
+    "url": "https://github.com/yosgi/GeoCopilot/issues"
+  },
+  "homepage": "https://github.com/yosgi/Gzhopilot#readme",
+  "peerDependencies": {
+    "cesium": "^1.131.0",
+    "langchain": "^0.3.29",
+    "openai": "^5.8.3",
+    "react": "^18.0.0 || ^19.0.0",
+    "react-dom": "^18.0.0 || ^19.0.0"
   },
   "dependencies": {
     "cesium": "^1.131.0",
     "langchain": "^0.3.29",
     "openai": "^5.8.3",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0"
+    "react": "^18.0.0 || ^19.0.0",
+    "react-dom": "^18.0.0 || ^19.0.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",

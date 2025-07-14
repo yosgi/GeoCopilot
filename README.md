@@ -1,70 +1,366 @@
-# GeoCopilot: AI-powered 3D BIM Digital Twin Assistant
+# GeoCopilot
 
-GeoCopilot is an AI assistant for controlling a 3D BIM (Building Information Modeling) digital twin scene using natural language commands. It leverages OpenAI's GPT models (via LangChain) and provides a seamless way to manage scene layers, camera, and more, all through conversational instructions.
+AI-powered 3D BIM scene control with natural language commands. Control your Cesium 3D scenes using simple, intuitive commands like "show all layers" or "fly to the building".
 
 ## Features
 
-- **Natural Language Control**: Hide/show layers, adjust transparency, focus camera, and more, just by talking to the AI.
-- **Layer Management**: Instantly control BIM, terrain, imagery, and other layers.
-- **Scene Context Awareness**: The AI always knows the current scene state and available layers.
-- **Extensible Tooling**: Easily add new tools (e.g., camera, measurement) for more advanced scene operations.
-- **Modern UI**: Built with React, CesiumJS, and Vite for fast development and beautiful 3D visualization.
+- 🤖 **AI-Powered Control**: Use natural language to control your 3D scene
+- 🏗️ **Layer Management**: Show/hide BIM layers with voice commands
+- 📷 **Camera Control**: Fly to positions, zoom, rotate with AI assistance
+- 🎯 **Scene Context**: AI understands your scene and provides intelligent responses
+- ⚡ **Real-time**: Immediate feedback and execution
+- 🔧 **Developer Friendly**: Simple hooks and TypeScript support
 
-## Getting Started
-
-### 1. Clone the repository
-
-```bash
-git clone https://github.com/yosgi/GeoCopilot.git
-cd GeoCopilot
-```
-
-### 2. Install dependencies
+## Installation
 
 ```bash
-npm install
+npm install GeoCopilot
 ```
 
-### 3. Configure environment variables
+## Quick Start
 
-Create a `.env` file in the project root with your OpenAI API key:
+### 1. Basic Setup
 
+```tsx
+import React, { useRef, useEffect } from 'react';
+import * as Cesium from 'cesium';
+import { useGeoCopilot, useSceneContext, useCameraControl } from 'GeoCopilot';
+
+const MyApp = () => {
+  const viewerRef = useRef<Cesium.Viewer | null>(null);
+  const cesiumContainerRef = useRef<HTMLDivElement>(null);
+  const [input, setInput] = React.useState('');
+  const apiKey = process.env.REACT_APP_OPENAI_API_KEY || 'your-api-key-here';
+  // Initialize hooks
+  const { contextManager } = useSceneContext();
+  const { loading, error, lastResponse, run, initialize } = useGeoCopilot(contextManager,apiKey);
+  const cameraControl = useCameraControl();
+
+  // Initialize Cesium viewer
+  useEffect(() => {
+    if (cesiumContainerRef.current && !viewerRef.current) {
+      // Create viewer
+      viewerRef.current = new Cesium.Viewer(cesiumContainerRef.current, {
+        globe: false,
+      });
+
+      // Initialize GeoCopilot
+      initialize(viewerRef.current);
+    }
+  }, [initialize, cameraControl]);
+
+  const handleCommand = async () => {
+    if (!input.trim()) return;
+    await run(input);
+    setInput('');
+  };
+
+  return (
+    <div style={{ display: 'flex', height: '100vh' }}>
+      <div style={{ width: 300, padding: 16 }}>
+        <textarea
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Try: 'show all layers'"
+        />
+        <button onClick={handleCommand} disabled={loading}>
+          {loading ? 'AI thinking...' : 'Execute Command'}
+        </button>
+        {error && <div>❌ {error}</div>}
+        {lastResponse && <div>✅ {lastResponse}</div>}
+      </div>
+      <div style={{ flex: 1 }}>
+        <div ref={cesiumContainerRef} style={{ width: '100%', height: '100%' }} />
+      </div>
+    </div>
+  );
+};
 ```
-VITE_OPENAI_API_KEY=sk-xxxxxxx
-```
 
-**Important:**  
-Never commit your `.env` file or API keys to version control!
+### 2. Environment Setup
 
-### 4. Run the development server
+Set your OpenAI API key:
 
 ```bash
-npm run dev
+# .env
+REACT_APP_OPENAI_API_KEY=your_openai_api_key_here
 ```
 
-Open [http://localhost:5173](http://localhost:5173) in your browser.
+### 3. Add Layers
 
-## How to Use
+```tsx
+// Register layers for AI control
+layerControl.registerObject('building', tileset, {
+  name: 'Building',
+  type: 'BIM',
+  visible: true
+});
 
-- Type or speak natural language commands in the AI chat box, e.g.:
-  - "Hide the Site layer"
-  - "Show only the Architecture and Facade layers"
-  - "Set the opacity of the Facade to 50%"
-  - "Show all BIM layers"
-- The AI will interpret your request and control the 3D scene accordingly.
-- You can also use the manual layer control panel for direct toggling.
+// Or register multiple layers
+const layers = [
+  { id: 'architecture', name: 'Architecture', visible: true },
+  { id: 'structural', name: 'Structural', visible: false },
+  { id: 'electrical', name: 'Electrical', visible: true },
+];
 
-## Development
+layers.forEach(layer => {
+  layerControl.registerObject(layer.id, null, {
+    name: layer.name,
+    type: 'BIM',
+    visible: layer.visible
+  });
+});
+```
 
-- The main logic for AI command parsing is in `src/agents/GeoCopilotAgent.ts`.
-- Layer control tools are in `src/tools/layerControl.ts`.
-- Scene state and Cesium integration are managed in `src/hooks/useSceneContext.ts` and `src/hooks/useGeoCopilot.ts`.
-- To add new AI tools, follow the LangChain tool interface and register them in the agent.
+## Available Commands
 
-## Security
+### Layer Control
+- `"show all layers"` - Show all registered layers
+- `"hide all layers"` - Hide all registered layers
+- `"show building layer"` - Show specific layer
+- `"hide structural layer"` - Hide specific layer
+- `"only show architecture and electrical"` - Show only specified layers
+- `"set building opacity to 0.5"` - Set layer transparency
 
-- **Never commit secrets**: `.env` is in `.gitignore` by default.
-- If you accidentally commit a secret, follow [GitHub's guide](https://docs.github.com/en/code-security/secret-scanning/working-with-secret-scanning/removing-a-secret-from-your-repositorys-history) to remove it from history.
+### Camera Control
+- `"fly to the building"` - Fly to a specific location
+- `"zoom in"` - Zoom closer to the scene
+- `"zoom out"` - Zoom away from the scene
+- `"rotate left 90 degrees"` - Rotate camera
+- `"switch to top view"` - Change camera angle
+- `"reset view"` - Return to initial position
+
+### Complex Commands
+- `"hide structural and electrical, then fly to the main entrance"` - Multiple actions
+- `"show only the building facade and zoom to 500 meters"` - Combined operations
+
+## API Reference
+
+### Hooks
+
+#### `useGeoCopilot(contextManager)`
+Main hook for AI-powered scene control.
+
+```tsx
+const { loading, error, lastResponse, run, clearHistory, initialize } = useGeoCopilot(contextManager);
+```
+
+**Returns:**
+- `loading: boolean` - AI processing state
+- `error: string | null` - Error message if any
+- `lastResponse: string | null` - Last AI response
+- `run(input: string): Promise<void>` - Execute AI command
+- `clearHistory(): void` - Clear response history
+- `initialize(viewer: Cesium.Viewer): void` - Initialize with Cesium viewer
+
+#### `useLayerControl()`
+Control layer visibility and properties.
+
+```tsx
+const { layers, loading, registerObject, setVisibility, showAll, hideAll } = useLayerControl();
+```
+
+**Methods:**
+- `registerObject(id, cesiumObject, metadata)` - Register a layer
+- `setVisibility(layerId, visible)` - Show/hide layer
+- `showAll()` - Show all layers
+- `hideAll()` - Hide all layers
+- `showOnly(layerIds)` - Show only specified layers
+
+#### `useCameraControl()`
+Control camera position and orientation.
+
+```tsx
+const { flyTo, setPosition, zoom, rotate, resetView } = useCameraControl();
+```
+
+**Methods:**
+- `flyTo(options)` - Smoothly fly to position
+- `setPosition(options)` - Instantly set camera position
+- `zoom(factor)` - Zoom in/out
+- `rotate(heading, pitch)` - Rotate camera
+- `resetView()` - Reset to default view
+
+#### `useSceneContext()`
+Access scene context and AI understanding.
+
+```tsx
+const { contextManager, context, getAIContext } = useSceneContext();
+```
+
+### Types
+
+```tsx
+interface GeoCopilotState {
+  loading: boolean;
+  error: string | null;
+  lastResponse: string | null;
+}
+
+interface LayerInfo {
+  id: string;
+  name: string;
+  type: string;
+  visible: boolean;
+  [key: string]: unknown;
+}
+
+interface CameraInfo {
+  longitude: number;
+  latitude: number;
+  height: number;
+  heading: number;
+  pitch: number;
+  roll: number;
+}
+```
+
+## Advanced Usage
+
+### Custom AI Tools
+
+You can extend the AI capabilities by creating custom tools:
+
+```tsx
+import { tool } from "@langchain/core/tools";
+import { z } from "zod";
+
+const createCustomTool = (myFunction) => {
+  return tool(
+    async ({ action, parameter }) => {
+      // Your custom logic here
+      return "Successfully executed custom action";
+    },
+    {
+      name: "customTool",
+      description: "Your custom tool description",
+      schema: z.object({
+        action: z.string(),
+        parameter: z.string().optional()
+      })
+    }
+  );
+};
+```
+
+### Scene Context Management
+
+```tsx
+const { contextManager } = useSceneContext();
+
+// Get current scene context
+const context = contextManager.getContext();
+
+// Get AI-optimized context
+const aiContext = contextManager.getAIContext();
+
+// Update scene description
+contextManager.updateSceneDescription("A modern office building with 5 floors");
+```
+
+## Examples
+
+### Complete Example with Layer Management
+
+```tsx
+import React, { useRef, useEffect } from 'react';
+import * as Cesium from 'cesium';
+import { useGeoCopilot, useSceneContext, useLayerControl, useCameraControl } from 'GeoCopilot';
+
+const CompleteExample = () => {
+  const viewerRef = useRef<Cesium.Viewer | null>(null);
+  const cesiumContainerRef = useRef<HTMLDivElement>(null);
+  const [input, setInput] = React.useState('');
+  const apiKey = process.env.REACT_APP_OPENAI_API_KEY || 'your-api-key-here';
+  const { contextManager } = useSceneContext();
+  const { loading, error, lastResponse, run, initialize, layerControl } = useGeoCopilot(contextManager,apiKey);
+  const cameraControl = useCameraControl();
+
+  useEffect(() => {
+    if (cesiumContainerRef.current && !viewerRef.current) {
+      viewerRef.current = new Cesium.Viewer(cesiumContainerRef.current, {
+        globe: false,
+      });
+
+      initialize(viewerRef.current);
+
+      // Add sample layers
+      const layers = [
+        { id: 'architecture', name: 'Architecture', visible: true },
+        { id: 'structural', name: 'Structural', visible: false },
+        { id: 'electrical', name: 'Electrical', visible: true },
+        { id: 'hvac', name: 'HVAC', visible: true },
+      ];
+
+      layers.forEach(layer => {
+        layerControl.registerObject(layer.id, null, {
+          name: layer.name,
+          type: 'BIM',
+          visible: layer.visible
+        });
+      });
+    }
+  }, [initialize, cameraControl, layerControl]);
+
+  const handleCommand = async () => {
+    if (!input.trim()) return;
+    await run(input);
+    setInput('');
+  };
+
+  return (
+    <div style={{ display: 'flex', height: '100vh' }}>
+      <div style={{ width: 300, padding: 16, background: '#f8f9fa' }}>
+        <h3>🤖 GeoCopilot</h3>
+        
+        <textarea
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Try: 'show all layers' or 'fly to building'"
+          style={{ width: '100%', height: 80, marginBottom: 8 }}
+        />
+
+        <button 
+          onClick={handleCommand}
+          disabled={loading}
+          style={{ width: '100%', padding: 8 }}
+        >
+          {loading ? '🤔 AI thinking...' : '🚀 Execute Command'}
+        </button>
+
+        {error && <div style={{ color: 'red' }}>❌ {error}</div>}
+        {lastResponse && <div style={{ color: 'green' }}>✅ {lastResponse}</div>}
+
+        {/* Layer Controls */}
+        <div style={{ marginTop: 16 }}>
+          <h4>Manual Layer Control</h4>
+          {layerControl.layers.map(layer => (
+            <label key={layer.id} style={{ display: 'block', marginBottom: 4 }}>
+              <input
+                type="checkbox"
+                checked={layer.visible}
+                onChange={() => layerControl.setVisibility(layer.id, !layer.visible)}
+              />
+              {layer.name}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ flex: 1 }}>
+        <div ref={cesiumContainerRef} style={{ width: '100%', height: '100%' }} />
+      </div>
+    </div>
+  );
+};
+```
+
+## Requirements
+
+- React 18+ or 19+
+- Cesium 1.131.0+
+- LangChain 0.3.29+
+- OpenAI API key
 
 ## License
 

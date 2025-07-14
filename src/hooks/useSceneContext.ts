@@ -68,8 +68,6 @@ export class SceneContextManager {
   private viewer: Cesium.Viewer | null = null;
   private listeners: Array<(context: SceneContext) => void> = [];
   // store Cesium objects, eslint-disable-next-line @typescript-eslint/no-explicit-any
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private cesiumObjects: Map<string, any> = new Map();
 
   constructor(initialContext: Partial<SceneContext> = {}) {
     this.context = {
