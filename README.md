@@ -2,6 +2,10 @@
 
 AI-powered 3D BIM scene control with natural language commands. Control your Cesium 3D scenes using simple, intuitive commands like "show all layers" or "fly to the building".
 
+## Live Demo
+
+![Live Demo](src/assets/example.gif)
+
 ## Features
 
 - 🤖 **AI-Powered Control**: Use natural language to control your 3D scene
