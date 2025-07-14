@@ -18,7 +18,7 @@ AI-powered 3D BIM scene control with natural language commands. Control your Ces
 ## Installation
 
 ```bash
-npm install GeoCopilot
+npm install geocopilot
 ```
 
 ## Quick Start
