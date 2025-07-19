@@ -1,7 +1,7 @@
 # GeoCopilot
 [![npm version](https://img.shields.io/npm/v/geocopilot)](https://www.npmjs.com/package/geocopilot)
 [![npm downloads](https://img.shields.io/npm/dw/geocopilot)](https://www.npmjs.com/package/geocopilot)
-
+[![npm downloads](https://img.shields.io/npm/dw/geocopilot)](https://www.npmjs.com/package/geocopilot)
 AI-powered 3D BIM scene control with natural language commands. Control your Cesium 3D scenes using simple, intuitive commands like "show all layers" or "fly to the building".
 
 ## Live Demo
