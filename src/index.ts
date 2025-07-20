@@ -1,34 +1,23 @@
-// Core hooks
+// Core exports
+export { GeoCopilot } from './core/GeoCopilot';
+export { ToolAdapter } from './core/ToolAdapter';
+export type { CoreTool, ExecutionResult, GeoCopilotConfig } from './core/GeoCopilot';
+
+// Hook exports
 export { useGeoCopilot } from './hooks/useGeoCopilot';
+export { useSceneContext } from './hooks/useSceneContext';
 export { useLayerControl, createLayerControlTool } from './hooks/useLayerControl';
 export { useCameraControl, createCameraControlTool } from './hooks/useCameraControl';
-export { useSceneContext, SceneContextManager } from './hooks/useSceneContext';
+export { useClippingControl, createClippingControlTool } from './hooks/useClippingControl';
 
-// Types
-export interface GeoCopilotState {
-  loading: boolean;
-  error: string | null;
-  lastResponse: string | null;
-}
+// Core component exports
+export { IntentParser } from './core/IntentParser';
+export { EntityRegistry } from './core/EntityRegistry';
+export { EntityMatcher } from './core/EntityMatcher';
+export { ValidationLayer } from './core/ValidationLayer';
+export { ContextManager } from './core/ContextManager';
 
-export interface LayerInfo {
-  id: string;
-  name: string;
-  type: string;
-  visible: boolean;
-  [key: string]: unknown;
-}
-
-export interface CameraInfo {
-  longitude: number;
-  latitude: number;
-  height: number;
-  heading: number;
-  pitch: number;
-  roll: number;
-}
-
-export type { SceneContext } from './hooks/useSceneContext';
-
-// Re-export Cesium types for convenience
-export type { Viewer, Camera, Cesium3DTileset } from 'cesium'; 
+// Type exports
+export type { Intent, ParsedIntent } from './core/IntentParser';
+export type { EntityMetadata } from './core/EntityRegistry';
+export type { ValidationResult, ValidationContext } from './core/ValidationLayer'; 

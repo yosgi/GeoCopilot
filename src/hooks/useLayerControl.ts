@@ -15,6 +15,8 @@ export const useLayerControl = () => {
     }>>([]);
     const [loading, setLoading] = useState(false);
     const cesiumObjectsRef = useRef<Map<string, { cesiumObject: unknown; metadata?: unknown }>>(new Map());
+    const viewerRef = useRef<Cesium.Viewer | null>(null);
+    const cleanupRef = useRef<(() => void) | null>(null);
 
     // register Cesium object
     const registerObject = useCallback((id: string, cesiumObject: unknown, metadata?: Record<string, unknown>) => {
@@ -36,6 +38,83 @@ export const useLayerControl = () => {
                 : [...prev, layerInfo];
         });
     }, []);
+
+    // Auto-detect and register Cesium objects
+    const startAutoDetection = useCallback((viewer: Cesium.Viewer) => {
+        // Prevent starting auto-detection on the same viewer multiple times
+        if (viewerRef.current === viewer) {
+            return cleanupRef.current || (() => {}); // Return existing cleanup function
+        }
+        
+        // Clean up any existing detection
+        if (cleanupRef.current) {
+            cleanupRef.current();
+        }
+        
+        viewerRef.current = viewer;
+        
+        // Scan existing primitives
+        const scanPrimitives = () => {
+            if (!viewerRef.current) return;
+            
+            const primitives = viewerRef.current.scene.primitives;
+            for (let i = 0; i < primitives.length; i++) {
+                const primitive = primitives.get(i);
+                if (primitive instanceof Cesium.Cesium3DTileset) {
+                    const assetId = primitive.asset?.assetId;
+                    
+                    // Generate a meaningful name based on assetId
+                    let name = `Tileset ${i + 1}`;
+                    if (assetId) {
+                        // Map known asset IDs to meaningful names
+                        const assetNameMap: Record<number, string> = {
+                            2887123: 'Architecture',
+                            2887125: 'Facade',
+                            2887130: 'Structural',
+                            2887124: 'Electrical',
+                            2887126: 'HVAC',
+                            2887127: 'Plumbing',
+                            2887129: 'Site',
+                            2275207: 'Google Photorealistic'
+                        };
+                        name = assetNameMap[assetId] || `Tileset ${assetId}`;
+                    }
+                    
+                    // Generate a unique ID for the tileset
+                    const id = name.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+                    
+                    // Check if already registered
+                    if (!cesiumObjectsRef.current.has(id)) {
+                        const metadata = {
+                            name: name,
+                            type: '3DTileset',
+                            description: `Auto-detected ${name} layer`,
+                            assetId: assetId
+                        };
+                        
+                        registerObject(id, primitive, metadata);
+                        console.log(`Auto-registered tileset: ${id} (${name})`);
+                    }
+                }
+            }
+        };
+        
+        // Initial scan
+        scanPrimitives();
+        
+        // Set up periodic scanning for new primitives
+        const interval = setInterval(scanPrimitives, 2000); // Scan every 2 seconds
+        
+        // Create and store cleanup function
+        const cleanup = () => {
+            clearInterval(interval);
+            cleanupRef.current = null;
+        };
+        cleanupRef.current = cleanup;
+        
+        // Return cleanup function
+        return cleanup;
+    }, [registerObject]);
 
     // set layer visibility
     const setVisibility = useCallback(async (layerId: string, visible: boolean) => {
@@ -152,6 +231,9 @@ export const useLayerControl = () => {
 
         // register method
         registerObject,
+
+        // auto-detection method
+        startAutoDetection,
 
         // control methods
         setVisibility,
