@@ -4,7 +4,13 @@ import { EntityMatcher } from './EntityMatcher';
 import { ValidationLayer, type ValidationResult, type ValidationContext } from './ValidationLayer';
 import { ContextManager } from './ContextManager';
 import type { OpenAI } from 'openai';
-
+import type {
+  ChatCompletionUserMessageParam,
+  ChatCompletionAssistantMessageParam,
+  ChatCompletionSystemMessageParam,
+  ChatCompletionMessageParam
+} from 'openai/resources/chat/completions';
+import { ClarificationAgent, ExecutionAgent } from './GeoCopilotAgents';
 // add tool system interface
 export interface CoreTool {
   name: string;
@@ -49,6 +55,7 @@ export interface ExecutionResult {
   executionTime: number;
   suggestions?: string[];
   metadata?: Record<string, unknown>;
+  clarificationQuestions?: string[]; 
 }
 
 export interface StreamStep {
@@ -70,6 +77,9 @@ export class GeoCopilot {
   private config: GeoCopilotConfig;
   private isInitialized = false;
   private openaiClient: OpenAI | null = null;
+  private dialogHistory: (ChatCompletionUserMessageParam | ChatCompletionAssistantMessageParam)[] = [];
+  private clarificationAgent: ClarificationAgent | null = null;
+  private executionAgent: ExecutionAgent | null = null;
 
   constructor(config: GeoCopilotConfig = {}) {
     this.config = {
@@ -139,23 +149,77 @@ export class GeoCopilot {
       if (!this.openaiClient) {
         this.openaiClient = await this.initializeOpenAIClient();
       }
+      // initialize agents
+      if (!this.clarificationAgent) {
+        const toolsDescription = this.buildToolsDescription();
+        const systemPrompt = this.buildSystemPrompt(toolsDescription);
+        this.clarificationAgent = new ClarificationAgent(this.openaiClient, systemPrompt);
+      }
+      if (!this.executionAgent) {
+        const toolsDescription = this.buildToolsDescription();
+        const systemPrompt = this.buildSystemPrompt(toolsDescription);
+        this.executionAgent = new ExecutionAgent(this.openaiClient, systemPrompt, this);
+      }
 
-      // build tools description
-      const toolsDescription = this.buildToolsDescription();
-      
-      // build system prompt
-      const systemPrompt = this.buildSystemPrompt(toolsDescription);
-      
-      // call OpenAI API
-      const response = await this.callOpenAI(input, systemPrompt);
-      
-      // parse response and execute tool
-      return await this.parseAndExecuteAIResponse(response);
-      
+      // use ClarificationAgent to determine if clarification is needed
+      const clarifyResult = await this.clarificationAgent.run(input);
+      if (clarifyResult.needsClarification) {
+        return {
+          success: false,
+          output: 'need clarification',
+          clarificationQuestions: clarifyResult.clarificationQuestions,
+          suggestions: clarifyResult.suggestions,
+          executionTime: 0
+        };
+      }
+      // no clarification needed
+      return await this.executionAgent.run(input);
     } catch (error) {
       console.warn('AI execution failed, falling back to local execution:', error);
       return this.execute(input);
     }
+  }
+
+  // call OpenAI for clarification
+  private async callOpenAIForClarification(input: string, systemPrompt: string): Promise<string> {
+    const messages: ChatCompletionMessageParam[] = [
+      { role: "system", content: systemPrompt } as ChatCompletionSystemMessageParam,
+      ...this.dialogHistory.slice(-6).map(m => {
+        if (m.role === "user") return m as ChatCompletionUserMessageParam;
+        if (m.role === "assistant") return m as ChatCompletionAssistantMessageParam;
+        return m;
+      }),
+      { role: "user", content: input } as ChatCompletionUserMessageParam
+    ];
+    console.log('[OpenAI Clarification] Messages:', messages);
+    const response = await this.openaiClient!.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages,
+      temperature: 0,
+      max_tokens: 100
+    });
+    return response.choices[0]?.message?.content?.trim() || '';
+  }
+
+  // call OpenAI for suggestions
+  private async callOpenAIForSuggestions(input: string, systemPrompt: string): Promise<string> {
+    const messages: ChatCompletionMessageParam[] = [
+      { role: "system", content: systemPrompt } as ChatCompletionSystemMessageParam,
+      ...this.dialogHistory.slice(-6).map(m => {
+        if (m.role === "user") return m as ChatCompletionUserMessageParam;
+        if (m.role === "assistant") return m as ChatCompletionAssistantMessageParam;
+        return m;
+      }),
+      { role: "user", content: input } as ChatCompletionUserMessageParam
+    ];
+    console.log('[OpenAI Suggestions] Messages:', messages);
+    const response = await this.openaiClient!.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages,
+      temperature: 0,
+      max_tokens: 200
+    });
+    return response.choices[0]?.message?.content?.trim() || '';
   }
 
   private async initializeOpenAIClient(): Promise<OpenAI> {
@@ -167,7 +231,7 @@ export class GeoCopilot {
     });
   }
 
-  private buildToolsDescription(): string {
+  public buildToolsDescription(): string {
     const tools = this.getAllTools();
     console.log('Available tools:', tools.map(t => t.name));
     return tools.map(tool => 
@@ -175,7 +239,7 @@ export class GeoCopilot {
     ).join('\n');
   }
 
-  private buildSystemPrompt(toolsDescription: string): string {
+  public buildSystemPrompt(toolsDescription: string): string {
     return `You are an AI assistant for controlling a 3D BIM digital twin scene.
 
 Available tools:
@@ -202,26 +266,7 @@ EXAMPLES:
 IMPORTANT: Always use tools, never say you cannot do something.`;
   }
 
-  private async callOpenAI(input: string, systemPrompt: string): Promise<string> {
-    console.log('System Prompt:', systemPrompt);
-    console.log('User Input:', input);
-    
-    const response = await this.openaiClient!.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: input }
-      ],
-      temperature: 0,
-      max_tokens: 1000
-    });
-
-    const aiResponse = response.choices[0]?.message?.content || '';
-    console.log('OpenAI Response:', aiResponse);
-    return aiResponse;
-  }
-
-  private async parseAndExecuteAIResponse(aiResponse: string): Promise<ExecutionResult> {
+  public async parseAndExecuteAIResponse(aiResponse: string): Promise<ExecutionResult> {
     console.log('AI Response:', aiResponse);
     
     // simple tool call parsing (can be extended as needed)

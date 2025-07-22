@@ -10,7 +10,7 @@ export const DemoPage = () => {
   const [layerVisibility, setLayerVisibility] = useState<Record<string, boolean>>({});
   const { contextManager, context, getAIContext } = useSceneContext();
   const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
-  const { loading, error, lastResponse, run, clearHistory, initialize, layerControl } = useGeoCopilot(contextManager, apiKey);
+  const { loading, error, lastResponse, run, clearHistory, initialize, layerControl, clarificationQuestions } = useGeoCopilot(contextManager, apiKey);
   const tilesetMapRef = useRef<Map<string, Cesium.Cesium3DTileset>>(new Map());
 
 
@@ -399,6 +399,29 @@ export const DemoPage = () => {
       {lastResponse && !loading && !error && (
         <div style={{ padding: 8, background: "#d1edff", borderRadius: 4, marginBottom: 8 }}>
           ✅ {lastResponse}
+        </div>
+      )}
+
+      {/* 澄清问题展示区 */}
+      {clarificationQuestions && clarificationQuestions.length > 0 && (
+        <div style={{
+          background: '#fffbe6',
+          border: '1px solid #ffe58f',
+          borderRadius: 6,
+          padding: 12,
+          marginBottom: 12,
+          color: '#ad8b00',
+          fontWeight: 500
+        }}>
+          <div style={{ marginBottom: 6 }}>🤔 Clarification needed:</div>
+          {clarificationQuestions.map((q, idx) => (
+            <div key={idx} style={{ marginBottom: 4 }}>
+              <span style={{ cursor: 'pointer', textDecoration: 'underline', color: '#fa8c16' }}
+                onClick={() => setInput(q)}
+                title="Click to fill this question into the input box"
+              >{q}</span>
+            </div>
+          ))}
         </div>
       )}
 

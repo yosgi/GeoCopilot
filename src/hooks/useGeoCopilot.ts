@@ -11,6 +11,8 @@ interface GeoCopilotState {
   loading: boolean;
   error: string | null;
   lastResponse: string | null;
+  clarificationQuestions: string[];
+  suggestions: string[];
 }
 
 export const useGeoCopilot = (contextManager: SceneContextManager, openaiApiKey: string) => {
@@ -21,7 +23,9 @@ export const useGeoCopilot = (contextManager: SceneContextManager, openaiApiKey:
   const [state, setState] = useState<GeoCopilotState>({
     loading: false,
     error: null,
-    lastResponse: null
+    lastResponse: null,
+    clarificationQuestions: [],
+    suggestions: []
   });
 
   const geoCopilotRef = useRef<GeoCopilot | null>(null);
@@ -52,7 +56,6 @@ export const useGeoCopilot = (contextManager: SceneContextManager, openaiApiKey:
       const activeLayers = layerControl.layers
         .filter(layer => layer.visible)
         .map(layer => layer.id);
-      console.log('Active layers:', activeLayers);
       geoCopilotRef.current.getContextManager().updateActiveLayers(activeLayers);
 
     }
@@ -68,7 +71,7 @@ export const useGeoCopilot = (contextManager: SceneContextManager, openaiApiKey:
   }, [contextManager, cameraControl, layerControl]);
 
   const run = useCallback(async (input: string) => {
-    setState(prev => ({ ...prev, loading: true, error: null }));
+    setState(prev => ({ ...prev, loading: true, error: null, clarificationQuestions: [], suggestions: [] }));
     
     try {
       if (!geoCopilotRef.current) {
@@ -85,20 +88,26 @@ export const useGeoCopilot = (contextManager: SceneContextManager, openaiApiKey:
         setState(prev => ({
           ...prev,
           loading: false,
-          lastResponse: finalResponse
+          lastResponse: finalResponse,
+          clarificationQuestions: [],
+          suggestions: result.suggestions || []
         }));
       } else {
         setState(prev => ({
           ...prev,
           loading: false,
-          error: finalResponse
+          error: finalResponse,
+          clarificationQuestions: result.clarificationQuestions || [],
+          suggestions: result.suggestions || []
         }));
       }
     } catch (err) {
       setState(prev => ({
         ...prev,
         loading: false,
-        error: err instanceof Error ? err.message : 'Unknown error occurred'
+        error: err instanceof Error ? err.message : 'Unknown error occurred',
+        clarificationQuestions: [],
+        suggestions: []
       }));
     }
   }, []);
@@ -107,7 +116,9 @@ export const useGeoCopilot = (contextManager: SceneContextManager, openaiApiKey:
     setState({
       loading: false,
       error: null,
-      lastResponse: null
+      lastResponse: null,
+      clarificationQuestions: [],
+      suggestions: []
     });
   }, []);
 

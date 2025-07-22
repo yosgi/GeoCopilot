@@ -93,7 +93,6 @@ export const useLayerControl = () => {
                         };
                         
                         registerObject(id, primitive, metadata);
-                        console.log(`Auto-registered tileset: ${id} (${name})`);
                     }
                 }
             }
