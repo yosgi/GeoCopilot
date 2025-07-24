@@ -67,7 +67,7 @@ export const useGeoCopilot = (contextManager: SceneContextManager, openaiApiKey:
     cameraControl.registerViewer(viewer);
     
     // Start auto-detection of Cesium objects
-    layerControl.startAutoDetection(viewer);
+    // layerControl.startAutoDetection(viewer);
   }, [contextManager, cameraControl, layerControl]);
 
   const run = useCallback(async (input: string) => {

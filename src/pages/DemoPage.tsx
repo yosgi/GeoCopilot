@@ -10,7 +10,7 @@ export const DemoPage = () => {
   const [layerVisibility, setLayerVisibility] = useState<Record<string, boolean>>({});
   const { contextManager, getAIContext } = useSceneContext();
   const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
-  const { loading, error, lastResponse, run, clearHistory, initialize, layerControl, clarificationQuestions } = useGeoCopilot(contextManager, apiKey);
+  const { loading, error, lastResponse, run, clearHistory, initialize, clarificationQuestions } = useGeoCopilot(contextManager, apiKey);
   const tilesetMapRef = useRef<Map<string, Cesium.Cesium3DTileset>>(new Map());
 
 
@@ -105,12 +105,6 @@ export const DemoPage = () => {
             const tileset = await Cesium.Cesium3DTileset.fromIonAssetId(assetId);
             const addedTileset = viewerRef.current.scene.primitives.add(tileset);
             const layerId = title.toLowerCase();
-            layerControl.registerObject(layerId, tileset, {
-                name: title,
-                type: 'BIM',
-                description: title + ' layer for building visualization',
-                assetId: assetId
-              });
             tileset.show = visible;
             tilesetMap.set(title, addedTileset);
             layerInfos.push({
@@ -278,9 +272,6 @@ export const DemoPage = () => {
     });
   }, []);
 
-  
-
-
   const showAIContext = () => {
     const aiContext = contextManager.getAIContext();
     console.log('AI Context:', aiContext);
@@ -317,7 +308,7 @@ export const DemoPage = () => {
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="try:&#10;• fly to the main building&#10;• hide the structural layer&#10;• show all BIM layers&#10;• measure distance&#10;• switch to night mode"
+          // placeholder="try:&#10;• fly to the main building&#10;• hide the structural layer&#10;• show all BIM layers&#10;• measure distance&#10;• switch to night mode"
           style={{ 
             width: "100%", 
             height: 80,
