@@ -252,8 +252,6 @@ export class SceneContextManager {
     description += `\n\nCamera position: height ${camera.position[2].toFixed(2)} meters,`;
     description += `heading ${(camera.orientation.heading * 180 / Math.PI).toFixed(1)} degrees,`;
     description += `pitch ${(camera.orientation.pitch * 180 / Math.PI).toFixed(1)} degrees.`;
-    
-    description += `\n\nVisible layers:`;
 
     if (selectedFeatures.length > 0) {
       description += `\n\nCurrently selected ${selectedFeatures.length} features.`;

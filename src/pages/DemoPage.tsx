@@ -8,7 +8,7 @@ export const DemoPage = () => {
   const cesiumContainerRef = useRef<HTMLDivElement>(null);
   const [input, setInput] = useState("");
   const [layerVisibility, setLayerVisibility] = useState<Record<string, boolean>>({});
-  const { contextManager, context, getAIContext } = useSceneContext();
+  const { contextManager, getAIContext } = useSceneContext();
   const apiKey = import.meta.env.VITE_OPENAI_API_KEY;
   const { loading, error, lastResponse, run, clearHistory, initialize, layerControl, clarificationQuestions } = useGeoCopilot(contextManager, apiKey);
   const tilesetMapRef = useRef<Map<string, Cesium.Cesium3DTileset>>(new Map());
@@ -397,12 +397,12 @@ export const DemoPage = () => {
       )}
       
       {lastResponse && !loading && !error && (
-        <div style={{ padding: 8, background: "#d1edff", borderRadius: 4, marginBottom: 8 }}>
+        <div style={{ padding: 8, background: "#d1edff", borderRadius: 4, marginBottom: 8,color: "#000" }}>
           ✅ {lastResponse}
         </div>
       )}
 
-      {/* 澄清问题展示区 */}
+      {/* clarification questions */}
       {clarificationQuestions && clarificationQuestions.length > 0 && (
         <div style={{
           background: '#fffbe6',
@@ -426,44 +426,16 @@ export const DemoPage = () => {
       )}
 
       {/* Scene status quick display */}
-      <div style={{ marginBottom: 16, padding: 8, background: "#e8f5e8", borderRadius: 4, color: "#000" }}>
+      {/* <div style={{ marginBottom: 16, padding: 8, background: "#e8f5e8", borderRadius: 4, color: "#000" }}>
         <h4 style={{ margin: "0 0 8px 0", fontSize: 14 }}>📍 Scene status</h4>
         <div style={{ fontSize: 12, lineHeight: 1.4 }}>
           <div><strong>Location:</strong> {context.location.name}</div>
           <div><strong>Camera height:</strong> {context.camera.position[2]?.toFixed(0)}m</div>
           <div><strong>Time:</strong> {context.environment.lighting === 'day' ? '☀️' : '🌙'} {new Date(context.environment.time).toLocaleTimeString()}</div>
         </div>
-      </div>
+      </div> */}
 
-      {/* AI command history */}
-      {/* {commands.length > 0 && (
-        <div style={{ marginBottom: 16 }}>
-          <h3 style={{ fontSize: 16, marginBottom: 8 }}>🤖 Recent AI commands</h3>
-          <div style={{ maxHeight: 150, overflowY: "auto" }}>
-            {commands.map((command, index) => (
-              <div key={index} style={{ 
-                marginBottom: 6, 
-                padding: 8, 
-                background: "#fff", 
-                borderRadius: 4,
-                border: "1px solid #ddd",
-                fontSize: 12
-              }}>
-                <div style={{ fontWeight: "bold", color: "#1976d2" }}>
-                  {command.action}
-                  {command.target && <span style={{ color: "#666" }}> → {command.target}</span>}
-                </div>
-                {command.parameters && (
-                  <div style={{ marginTop: 4, color: "#666", fontSize: 11 }}>
-                    {JSON.stringify(command.parameters)}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      )} */}
-
+  
       {/* Traditional layer control */}
       <div style={{ marginBottom: 16, color: "#000" }}>
         <h3 style={{ fontSize: 16, marginBottom: 8 }}>🏗️ Manual layer control</h3>
@@ -486,7 +458,7 @@ export const DemoPage = () => {
         ))}
       </div>
 
-      {/* AI command examples */}
+      AI command examples
       <div style={{ marginBottom: 16, color: "#000" }}>
         <h3 style={{ fontSize: 16, marginBottom: 8 }}>💡 AI command examples</h3>
         <div style={{ fontSize: 12 }}>
@@ -526,58 +498,6 @@ export const DemoPage = () => {
           ))}
         </div>
       </div>
-
-      {/* Keyboard shortcuts */}
-      <div style={{ 
-        padding: 8, 
-        background: "#f0f0f0", 
-        borderRadius: 4, 
-        fontSize: 11,
-        color: "#666"
-      }}>
-        <strong>Keyboard shortcuts:</strong><br/>
-        • Ctrl+Enter: Execute AI command<br/>
-        • Click on example commands to quickly input<br/>
-        • AI will respond intelligently based on the current scene state
-      </div>
-
-      {/* Debug information */}
-      <details style={{ marginTop: 16 }}>
-        <summary style={{ cursor: "pointer", fontSize: 14, color: "#666" }}>
-          🔧 Developer debug information
-        </summary>
-        <div style={{ marginTop: 8 }}>
-          {/* <div style={{ marginBottom: 8 }}>
-            <strong>Scene layer status:</strong>
-            <pre style={{ fontSize: 10, background: "#f5f5f5", padding: 4, margin: "4px 0" }}>
-              {JSON.stringify(
-                context.layers.map(l => ({ name: l.name, visible: l.visible })), 
-                null, 2
-              )}
-            </pre>
-          </div> */}
-          
-          <div style={{ marginBottom: 8 }}>
-            <strong>Camera status:</strong>
-            <pre style={{ fontSize: 10, background: "#f5f5f5", padding: 4, margin: "4px 0" }}>
-              {JSON.stringify({
-                height: context.camera.position[2]?.toFixed(2),
-                heading: (context.camera.orientation.heading * 180 / Math.PI).toFixed(1) + "°",
-                pitch: (context.camera.orientation.pitch * 180 / Math.PI).toFixed(1) + "°"
-              }, null, 2)}
-            </pre>
-          </div>
-
-          {/* {commands.length > 0 && (
-            <div>
-              <strong>Last executed command:</strong>
-              <pre style={{ fontSize: 10, background: "#f5f5f5", padding: 4, margin: "4px 0" }}>
-                {JSON.stringify(commands[commands.length - 1], null, 2)}
-              </pre>
-            </div>
-          )} */}
-        </div>
-      </details>
     </div>
 
     {/* Cesium 3D view */}

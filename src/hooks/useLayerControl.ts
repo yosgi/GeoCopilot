@@ -55,7 +55,7 @@ export const useLayerControl = () => {
         
         // Scan existing primitives
         const scanPrimitives = () => {
-            if (!viewerRef.current) return;
+            if (!viewerRef.current || !viewerRef.current.scene) return;
             
             const primitives = viewerRef.current.scene.primitives;
             for (let i = 0; i < primitives.length; i++) {
